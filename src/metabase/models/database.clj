@@ -125,6 +125,10 @@
           :can-read?         (partial i/current-user-has-partial-permissions? :read)
           :can-write?        i/superuser?}))
 
+(defn get-db-details 
+  [db-id]
+  (:details (db/select-one [Database :details] :id db-id))
+   )
 
 ;;; ---------------------------------------------- Hydration / Util Fns ----------------------------------------------
 

@@ -3,6 +3,10 @@
             [metabase.query-processor.util :as qputil]
             [toucan.db :as db]))
 
+(defn resolve-source-table-id [source-table-id]
+  (db/select-one [Table :schema :name :id], :id source-table-id)
+)
+
 (defn- resolve-source-table
   [expanded-query-dict]
   (let [source-table-id (qputil/get-in-normalized expanded-query-dict [:query :source-table])]

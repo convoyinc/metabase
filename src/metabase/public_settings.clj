@@ -117,6 +117,16 @@
   :type    :integer
   :default 10)
 
+(defsetting enable-redshiftstate-caching
+  (tru "test")
+  :type    :boolean
+  :default false)
+
+(defsetting redshiftstate-caching-db-num
+  (tru "test")
+  :type    :integer
+  :default -1)
+
 (defsetting breakout-bins-num
   (tru "When using the default binning strategy and a number of bins is not provided, this number will be used as the default.")
   :type :integer
@@ -158,6 +168,8 @@
    :email_configured      ((resolve 'metabase.email/email-configured?))
    :embedding             (enable-embedding)
    :enable_query_caching  (enable-query-caching)
+   :enable_redshiftstate_caching  (enable-redshiftstate-caching)
+   :redshiftstate_caching_db_num  (redshiftstate-caching-db-num)
    :enable_nested_queries (enable-nested-queries)
    :engines               ((resolve 'metabase.driver/available-drivers))
    :ga_code               "UA-60817802-1"

@@ -152,6 +152,10 @@
                   (str schema \.))
                 table-name)))
 
+(defn qualified-identifier-string
+  ^clojure.lang.Keyword [{schema :schema, table-name :name}]
+  (str schema "." table-name))
+  
 (defn database
   "Return the `Database` associated with this `Table`."
   [table]

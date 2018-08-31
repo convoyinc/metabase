@@ -18,15 +18,32 @@
              [config :as config]
              [public-settings :as public-settings]
              [util :as u]]
+            [metabase.query-processor.middleware.source-table :as source-table]
             [metabase.query-processor.middleware.cache-backend.interface :as i]
             [metabase.query-processor.util :as qputil]
-            [metabase.util.date :as du]))
+            [metabase.query-processor.middleware.mbql-to-native :as mbql-to-native]
+            [metabase.util.date :as du]
+            [metabase.models
+             [database :as dbm]
+             [interface :as mi]
+             [permissions :as perms]
+             [permissions-group :as perm-group]]
+            [toucan
+             [db :as db]
+             [models :as models]]))
 
 (def ^:dynamic ^Boolean *ignore-cached-results*
   "Should we force the query to run, ignoring cached results even if they're available?
   Setting this to `true` will run the query again and will still save the updated results."
   false)
 
+(def redshift-statecache (atom nil))
+;; enabled = turned on in the settings, and the db in the settings is also set
+(defn is-redshift-statecache-enabled? [] (and (public-settings/enable-redshiftstate-caching) (> (public-settings/redshiftstate-caching-db-num) 0)))
+;; valid = enabled, the db for this call matches the db in the settings, the redshift-statecache isn't null, and the cache itself reports valid
+(defn is-redshift-statecache-valid? [db-num] (and (is-redshift-statecache-enabled?) (= (public-settings/redshiftstate-caching-db-num) db-num ) @redshift-statecache (. @redshift-statecache isValid)))
+(defn redshift-statecache-get-max-ttl-seconds [] (. @redshift-statecache getMaxTtlSeconds))
+(defn redshift-statecache-should-return-cached-result? [query last-updated] (. @redshift-statecache shouldReturnCachedResult query last-updated))
 
 ;;; ---------------------------------------------------- Backend -----------------------------------------------------
 
@@ -70,18 +87,43 @@
 
 ;;; ------------------------------------------------ Cache Operations ------------------------------------------------
 
-(defn- cached-results [query-hash max-age-seconds]
+(defn- cached-results [qp query query-hash max-age-seconds]
   (when-not *ignore-cached-results*
-    (when-let [results (i/cached-results @backend-instance query-hash max-age-seconds)]
-      (assert (du/is-temporal? (:updated_at results))
+  ;; If the redshift cacle is enabled & can be used for this query, we override the magic number and set the max-age-seconds to its max value. If the redshift-statcache can't give
+  ;; a definitive answer, we'll fall back and re-evaluate with the original max-age-seconds
+  (let [max-age-seconds-override (if (is-redshift-statecache-valid? (:database query)) (redshift-statecache-get-max-ttl-seconds) max-age-seconds) ]
+    ;; get the cached result if one exists
+    (when-let [results (i/cached-results @backend-instance query-hash (max max-age-seconds max-age-seconds-override))]
+
+      ;; debugging...
+     ;; (log/info (str "*!*!*!*!*!*!RESULTS: "  
+       ;; (not= (public-settings/redshiftstate-caching-db-num) (:database query))  " "
+      ;; (or (not @redshift-statecache) (not (is-redshift-statecache-enabled?))) " "
+       ;; (and  @redshift-statecache (is-redshift-statecache-enabled?) (= (:type query) "native") (redshift-statecache-should-return-cached-result? query (.getTime (:updated_at results)))) " "
+       ;; (and @redshift-statecache (is-redshift-statecache-enabled?) (= (:type query) "query") (redshift-statecache-should-return-cached-result? (metabase.models.table/qualified-identifier-string (source-table/resolve-source-table-id (get-in query [:query :source_table]))) (.getTime (:updated_at results)))))) 
+      
+      ;; get the reshift cache result depending on whether or not it's active, and if it is whether or not the query is native
+      (let [redshift-cache-result (if (not (is-redshift-statecache-valid? (:database query))) 
+                                          2 ;; redshift-statecache isnt valid so mark its answer as 2 (pass)
+                                          ;; otherwise, get the actual answer
+                                          (if (= (:type query) "native") 
+                                            (redshift-statecache-should-return-cached-result? query (.getTime (:updated_at results))) 
+                                            (redshift-statecache-should-return-cached-result? (metabase.models.table/qualified-identifier-string (source-table/resolve-source-table-id (get-in query [:query :source_table]))) (.getTime (:updated_at results)))))]
+      
+      (when (or 
+              ;; the cache result is true
+              (= 1 redshift-cache-result)
+              ;; the cache result is unknown, so fallback to the original max-age-seconds        
+              (>= (. (:updated_at results) getTime) (- (System/currentTimeMillis) (* 1000 max-age-seconds))))
+        ;; we can return the cached result!
+        (assert (du/is-temporal? (:updated_at results))
         "cached-results should include an `:updated_at` field containing the date when the query was last ran.")
-      (log/info "Returning cached results for query" (u/emoji "💾"))
-      (assoc results :cached true))))
+        (log/info "Returning cached results for query" (u/emoji "💾"))
+        (assoc results :cached true)))))))
 
 (defn- save-results!  [query-hash results]
   (log/info "Caching results for next time for query" (u/emoji "💾"))
   (i/save-results! @backend-instance query-hash results))
-
 
 ;;; --------------------------------------------------- Middleware ---------------------------------------------------
 
@@ -117,13 +159,13 @@
         total-time-ms (- (System/currentTimeMillis) start-time-ms)
         min-ttl-ms    (* (public-settings/query-caching-min-ttl) 1000)]
     (log/info (format "Query took %d ms to run; miminum for cache eligibility is %d ms" total-time-ms min-ttl-ms))
-    (when (>= total-time-ms min-ttl-ms)
+    (when (>= (+ 1000 total-time-ms) min-ttl-ms)
       (save-results-if-successful! query-hash results))
     results))
 
 (defn- run-query-with-cache [qp {cache-ttl :cache_ttl, :as query}]
   (let [query-hash (qputil/query-hash query)]
-    (or (cached-results query-hash cache-ttl)
+    (or (cached-results qp query query-hash cache-ttl)
         (run-query-and-save-results-if-successful! query-hash qp query))))
 
 
@@ -143,6 +185,22 @@
   ;; choose the caching backend if needed
   (when-not @backend-instance
     (set-backend!))
+  ;; The statecache is enabled in the settings, but not created, so set it up
+  (when (and (= @redshift-statecache nil) (is-redshift-statecache-enabled?))
+    (let 
+      [db-details (dbm/get-db-details (public-settings/redshiftstate-caching-db-num))]
+      ;; Call swap to create a new RedshiftStateCache if the current atom is nil, otherwise just return the existing object
+      (swap! redshift-statecache (fn [current] (if (= current nil) (new RedshiftStateCache 120  (:host db-details) (:user db-details) (:password db-details) (:db db-details) (int (:port db-details))) current)))
+      ;;(swap! redshift-statecache (fn [current] (if (= current nil) (new RedshiftStateCache 120  "dbHost" "dbUser" "dbPass" "dbName" ) current)))    (Integer. (int (:port db-details)))
+      )
+    (log/info "*****CREATING REDSHIFT STATE CACHE!!!!!!")
+  )
+
+  (when (and @redshift-statecache (= (is-redshift-statecache-enabled?) false))
+    (. @redshift-statecache cancel)
+    (reset! redshift-statecache nil)
+    (log/info "*****REMOVING REDSHIFT STATE CACHE!!!!!!")
+  )
   ;; ok, now do the normal middleware thing
   (fn [query]
     (if-not (is-cacheable? query)
