@@ -23,6 +23,23 @@
 
 ;;; ---------------------------------------------------- UTIL FNS ----------------------------------------------------
 
+(def config-allow-origins
+  (atom
+    (when-not (str/blank? (config/config-str :mb-api-allow-origin))
+      (into #{} (map str/trim (str/split (config/config-str :mb-api-allow-origin) #","))))))
+
+(def config-allow-localhost-origins
+  (= (config/config-str :mb-allow-localhost-origins) "true"))
+
+(defn api-allow-origin?
+  "Should the Access-Control-Allow-Origin header be added for this request?"
+  [origin site-url]
+  (and (not (= origin site-url))
+       (not (str/blank? origin))
+       (or 
+        (and config-allow-localhost-origins (= "localhost" (u/url-host origin)))
+        (and (not (empty? @config-allow-origins)) (contains? @config-allow-origins origin)))))
+
 (defn- api-call?
   "Is this ring request an API call (does path start with `/api`)?"
   [{:keys [^String uri]}]
@@ -224,10 +241,12 @@
   (when-let [k (ssl-certificate-public-key)]
     {"Public-Key-Pins" (format "pin-sha256=\"base64==%s\"; max-age=31536000" k)}))
 
-(defn- api-security-headers [] ; don't need to include all the nonsense we include with index.html
+(defn- api-security-headers [origin] ; don't need to include all the nonsense we include with index.html
   (merge (cache-prevention-headers)
          strict-transport-security-header
-         #_(public-key-pins-header)))
+         #_(public-key-pins-header)
+         (when (api-allow-origin? origin (public-settings/site-url))
+            { "Access-Control-Allow-Origin" origin "Access-Control-Allow-Credentials" "true" })))
 
 (defn- html-page-security-headers [& {:keys [allow-iframes?]
                                       :or   {allow-iframes? false}}]
@@ -252,7 +271,7 @@
   (fn [request]
     (let [response (handler request)]
       (update response :headers merge (cond
-                                        (api-call? request) (api-security-headers)
+                                        (api-call? request) (api-security-headers ((request :headers) "origin"))
                                         (public? request)   (html-page-security-headers, :allow-iframes? true)
                                         (embed? request)    (html-page-security-headers, :allow-iframes? true)
                                         (index? request)    (html-page-security-headers))))))
