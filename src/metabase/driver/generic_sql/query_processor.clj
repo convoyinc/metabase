@@ -3,6 +3,7 @@
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [clojure.repl :as repl]
             [honeysql
              [core :as hsql]
              [helpers :as h]]
@@ -27,7 +28,8 @@
              [i18n :refer [tru]]]
             [schema.core :as s])
   (:import [java.sql PreparedStatement ResultSet ResultSetMetaData SQLException]
-           [java.util Calendar Date TimeZone]))
+           [java.util Calendar Date TimeZone]
+           [org.joda.time.DateTimeZone]))
 
 ;; TODO - yet another `*query*` dynamic var. We should really consolidate them all so we only need a single one.
 (def ^:dynamic *query*
@@ -548,6 +550,13 @@
       (catch SQLException e
         (parse-date-as-string tz rs i)))))
 
+(defn- get-timestamp [^ResultSet rs _ ^Integer i]
+    (try
+        (let [datetime-with-timezone (driver/first-successful-parse (driver/create-db-time-formatters "yyyy-MM-dd HH:mm:ss.SSS Z") (.getString rs i))]
+        (.toLocalDateTime datetime-with-timezone))
+      (catch Exception e
+        (.getObject rs i))))
+
 (defn- get-object [^ResultSet rs _ ^Integer i]
   (.getObject rs i))
 
@@ -560,6 +569,9 @@
 
     (and tz (= column-type java.sql.Types/TIMESTAMP))
     (get-timestamp tz)
+
+    (= column-type java.sql.Types/TIMESTAMP)
+    get-timestamp
 
     :else
     get-object))
@@ -717,9 +729,12 @@
   "Process and run a native (raw SQL) QUERY."
   [driver {settings :settings, query :native, :as outer-query}]
   (let [query (assoc query :remark (qputil/query->remark outer-query))]
-    (do-with-try-catch
-      (fn []
-        (let [db-connection (sql/db->jdbc-connection-spec (qp.store/database))]
-          ((if (seq (:report-timezone settings))
-             run-query-with-timezone
-             run-query-without-timezone) driver settings db-connection query))))))
+      (do-with-try-catch
+        (fn []
+          (let [db-connection (sql/db->jdbc-connection-spec (qp.store/database))]
+          ; Need to figure out how to add a setting for the Snwoflake driver specifically, but for now
+          ; just hardcode this here since it's the same for Redshift & Snowflake
+          (let [settings (assoc settings :report-timezone "UTC")]
+            ((if (seq (:report-timezone settings))
+              run-query-with-timezone
+              run-query-without-timezone) driver settings db-connection query)))))))

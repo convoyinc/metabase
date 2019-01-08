@@ -413,7 +413,7 @@
                    ~message
                    (format-nanoseconds (- (System/nanoTime) start-time#))))))))
 
-(defn- str->date-time-with-formatters
+(defn str->date-time-with-formatters
   "Attempt to parse `date-str` using `formatters`. First successful parse is returned, or `nil` if it cannot be
   successfully parsed."
   ([formatters date-str]

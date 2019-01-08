@@ -384,7 +384,7 @@
   [(.withOffsetParsed ^DateTimeFormatter (tformat/formatter date-format-str))
    (ThreadSafeSimpleDateFormat. date-format-str)])
 
-(defn- first-successful-parse
+(defn first-successful-parse
   "Attempt to parse `time-str` with each of `date-formatters`, returning the first successful parse. If there are no
   successful parses throws the exception that the last formatter threw."
   [date-formatters time-str]

@@ -50,10 +50,10 @@
   clojure.lang.Named
   (getName [_] "Snowflake"))
 
-(def ^:private snowflake-date-formatters
+(def snowflake-date-formatters
   "The default timestamp format for Snowflake.
   See https://docs.snowflake.net/manuals/sql-reference/data-types-datetime.html#timestamp."
-  (driver/create-db-time-formatters "yyyy-MM-dd HH:mm:ss.SSSSSSSSS Z"))
+  (driver/create-db-time-formatters "yyyy-MM-dd HH:mm:ss.SSS Z"))
 
 (def ^:private snowflake-db-time-query
   "Snowflake current database time, with hour and minute timezone offset."
