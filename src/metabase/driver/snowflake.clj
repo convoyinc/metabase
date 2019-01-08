@@ -34,8 +34,8 @@
             :client_metadata_request_use_connection_ctx true
             :ssl                                        true
             ;; other SESSION parameters
-            ;; use the same week start we use for all the other drivers
-            :week_start                                 7
+            ;; use the default snowflake week_start, which matches Redshift
+            :week_start                                 0
             ;; not 100% sure why we need to do this but if we don't set the connection to UTC our report timezone
             ;; stuff doesn't work, even though we ultimately override this when we set the session timezone
             :timezone                                   "UTC"}
