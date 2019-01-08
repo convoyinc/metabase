@@ -552,8 +552,8 @@
 
 (defn- get-timestamp [^ResultSet rs _ ^Integer i]
     (try
-        (let [datetime-with-timezone (driver/first-successful-parse (driver/create-db-time-formatters "yyyy-MM-dd HH:mm:ss.SSS Z") (.getString rs i))]
-        (.toLocalDateTime datetime-with-timezone))
+        (let [datetime (.toDateTime (.toLocalDateTime (driver/first-successful-parse (driver/create-db-time-formatters "yyyy-MM-dd HH:mm:ss.SSS Z") (.getString rs i))))]
+            (new java.sql.Timestamp (.getMillis datetime)))
       (catch Exception e
         (.getObject rs i))))
 
