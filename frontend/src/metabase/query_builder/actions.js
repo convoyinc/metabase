@@ -204,7 +204,10 @@ export const initializeQB = (location, params) => {
 
     // always start the QB by loading up the databases for the application
     try {
-      await dispatch(fetchDatabases());
+      // Don't need to block for the databases being fetched... Existing questions can be run without
+      // loading the data, and the database dropdown menu blocks on its own waiting for the DB data to be
+      // populated so there's no downside to just loading the query builder immediately
+      dispatch(fetchDatabases());
       databasesList = getDatabasesList(getState());
     } catch (error) {
       console.error("error fetching dbs", error);
