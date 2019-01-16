@@ -4,6 +4,7 @@
    The new implementation uses prepared statement args instead of substituting them directly into the query,
    and is much better-organized and better-documented."
   (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [honeysql.core :as hsql]
             [medley.core :as m]
             [metabase.driver :as driver]
@@ -388,9 +389,10 @@
   "second", "s", "sec", "seconds", "secs"})
 
 (defn- create-replacement-snippet [nil-or-obj]
-  (let [nil-or-obj-for-params (if (contains? date-parts nil-or-obj) nil nil-or-obj)]
+  (let [nil-or-obj-for-params (if (contains? date-parts (str/lower-case nil-or-obj)) nil nil-or-obj)]
   (let [{:keys [sql-string param-values]} (sql/->prepared-substitution qp.i/*driver* nil-or-obj-for-params)]
-    {:replacement-snippet   (if (contains? date-parts nil-or-obj) (str "'" nil-or-obj "'") sql-string)
+    (log/info "WTFFFFFFF " nil-or-obj)
+    {:replacement-snippet   (if (contains? date-parts (str/lower-case nil-or-obj)) (str "'" (str/lower-case nil-or-obj) "'") sql-string)
      :prepared-statement-args param-values})))
 
 (defn- prepared-ts-subs [operator date-str]
