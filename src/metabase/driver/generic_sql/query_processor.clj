@@ -675,17 +675,15 @@
 
 (defn- do-with-auto-commit-disabled
   "Disable auto-commit for this transaction, and make the transaction `rollback-only`, which means when the
-  transaction finishes `.rollback` will be called instead of `.commit`. Furthermore, execute F in a try-finally block;
-  in the `finally`, manually call `.rollback` just to be extra-double-sure JDBC any changes made by the transaction
-  aren't committed."
+  transaction finishes `.rollback` will be called instead of `.commit`. "
   {:style/indent 1}
   [conn f]
   (jdbc/db-set-rollback-only! conn)
-  (.setAutoCommit (jdbc/get-connection conn) false)
+  ;;(.setAutoCommit (jdbc/get-connection conn) false)
   ;; TODO - it would be nice if we could also `.setReadOnly` on the transaction as well, but that breaks setting the
   ;; timezone. Is there some way we can have our cake and eat it too?
   (try (f)
-       (finally (.rollback (jdbc/get-connection conn)))))
+       (finally )))
 
 (defn- do-in-transaction [connection f]
   (jdbc/with-db-transaction [transaction-connection connection]
@@ -725,6 +723,7 @@
 
 ;;; ------------------------------------------------- execute-query --------------------------------------------------
 
+
 (defn execute-query
   "Process and run a native (raw SQL) QUERY."
   [driver {settings :settings, query :native, :as outer-query}]
@@ -732,9 +731,15 @@
       (do-with-try-catch
         (fn []
           (let [db-connection (sql/db->jdbc-connection-spec (qp.store/database))]
-          ; Need to figure out how to add a setting for the Snwoflake driver specifically, but for now
-          ; just hardcode this here since it's the same for Redshift & Snowflake
-          (let [settings (assoc settings :report-timezone "UTC")]
+          ;; Hacky hack hack - try to speedup Snowflake queries by calling directly into run-query-without-timezone until I get the settings thing figured out
+          (if (= (str (type driver)) "class metabase.driver.snowflake.SnowflakeDriver") 
+            (let [settings (assoc settings :report-timezone "UTC")] (run-query-without-timezone driver settings db-connection query))
             ((if (seq (:report-timezone settings))
               run-query-with-timezone
-              run-query-without-timezone) driver settings db-connection query)))))))
+              run-query-without-timezone) driver settings db-connection query)
+            )
+
+          ; Need to figure out how to add a setting for the Snwoflake driver specifically, but for now
+          ; just hardcode this here since it's the same for Redshift & Snowflake
+          
+          )))))
