@@ -121,6 +121,12 @@
                       (or (re-matches #"^.+\..{2,}$" host) ; 2+ letter TLD
                           (= host "localhost"))))))))
 
+(defn url-host
+  "Returns the host component of a url"
+  [^String s]
+  (when-let [^java.net.URL url (ignore-exceptions (java.net.URL. s))]
+    (.getHost url)))
+
 (defn sequence-of-maps?
   "Is COLL a sequence of maps?"
   [coll]

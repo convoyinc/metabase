@@ -24,6 +24,23 @@
 
 ;;; ---------------------------------------------------- UTIL FNS ----------------------------------------------------
 
+(def config-allow-origins
+  (atom
+    (when-not (str/blank? (config/config-str :mb-api-allow-origin))
+      (into #{} (map str/trim (str/split (config/config-str :mb-api-allow-origin) #","))))))
+
+(def config-allow-localhost-origins
+  (= (config/config-str :mb-allow-localhost-origins) "true"))
+
+(defn api-allow-origin?
+  "Should the Access-Control-Allow-Origin header be added for this request?"
+  [origin site-url]
+  (and (not (= origin site-url))
+       (not (str/blank? origin))
+       (or 
+        (and config-allow-localhost-origins (= "localhost" (u/url-host origin)))
+        (and (not (empty? @config-allow-origins)) (contains? @config-allow-origins origin)))))
+
 (defn- api-call?
   "Is this ring request an API call (does path start with `/api`)?"
   [{:keys [^String uri]}]
@@ -226,7 +243,7 @@
   (when-let [k (ssl-certificate-public-key)]
     {"Public-Key-Pins" (format "pin-sha256=\"base64==%s\"; max-age=31536000" k)}))
 
-(defn- security-headers [& {:keys [allow-iframes? allow-cache?]
+(defn- security-headers [origin & {:keys [allow-iframes? allow-cache?]
                             :or   {allow-iframes? false, allow-cache? false}}]
   (merge
    (if allow-cache?
@@ -238,6 +255,9 @@
    (when-not allow-iframes?
      ;; Tell browsers not to render our site as an iframe (prevent clickjacking)
      {"X-Frame-Options"                 "DENY"})
+     ;; Add allow origin headers if settings dictate
+   (when (api-allow-origin? origin (public-settings/site-url))
+            { "Access-Control-Allow-Origin" origin "Access-Control-Allow-Credentials" "true" })
    { ;; Tell browser to block suspected XSS attacks
     "X-XSS-Protection"                  "1; mode=block"
     ;; Prevent Flash / PDF files from including content from site.
@@ -251,7 +271,7 @@
   (fn [request]
     (let [response (handler request)]
       ;; add security headers to all responses, but allow iframes on public & embed responses
-      (update response :headers merge (security-headers :allow-iframes? ((some-fn public? embed?) request)
+      (update response :headers merge (security-headers ((request :headers) "origin") :allow-iframes? ((some-fn public? embed?) request)
                                                         :allow-cache?   (cacheable? request))))))
 
 (defn add-content-type
