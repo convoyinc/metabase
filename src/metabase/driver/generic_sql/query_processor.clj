@@ -707,6 +707,10 @@
 (defn- run-query-without-timezone [driver _ connection query]
   (do-in-transaction connection (partial run-query driver query nil)))
 
+(defn- run-query-without-timezone-or-transaction [driver _ connection query]
+  (try (run-query driver query nil connection)
+        (finally)))
+
 (defn- run-query-with-timezone [driver {:keys [^String report-timezone] :as settings} connection query]
   (try
     (do-in-transaction connection (fn [transaction-connection]
@@ -732,9 +736,12 @@
       (do-with-try-catch
         (fn []
           (let [db-connection (sql/db->jdbc-connection-spec (qp.store/database))]
-          ; Need to figure out how to add a setting for the Snwoflake driver specifically, but for now
-          ; just hardcode this here since it's the same for Redshift & Snowflake
-          (let [settings (assoc settings :report-timezone "UTC")]
-            ((if (seq (:report-timezone settings))
-              run-query-with-timezone
-              run-query-without-timezone) driver settings db-connection query)))))))
+            ;; Hacky hack hack - Snowflake can't deal with the transaction calls generated from the normal execution path here
+            ;; so we're relying entirely on the permissions in Snowflake for the metabase_ro account to prevent bad stuff from 
+            ;; happening...
+            (if (= (str (type driver)) "class metabase.driver.snowflake.SnowflakeDriver") 
+              (let [settings (assoc settings :report-timezone "UTC")]
+                (run-query-without-timezone-or-transaction driver settings db-connection query))
+              ((if (seq (:report-timezone settings))
+                run-query-with-timezone
+                run-query-without-timezone) driver settings db-connection query)))))))
