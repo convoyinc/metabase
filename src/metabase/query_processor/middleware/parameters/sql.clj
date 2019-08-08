@@ -378,10 +378,21 @@
   {:replacement-snippet     (str \( (str/join " AND " (map :replacement-snippet replacement-snippet-maps)) \))
    :prepared-statement-args (reduce concat (map :prepared-statement-args replacement-snippet-maps))})
 
+(def date-parts #{
+  "year", "y", "yy", "yyy", "yyyy", "yr", "years", "yrs", 
+  "month", "mm", "mon", "mons", "months", 
+  "day", "d", "dd", "days", "dayofmonth", 
+  "week", "w", "wk", "weekofyear", "woy", "wy", 
+  "quarter", "q", "qtr", "qtrs", "quarters", 
+  "hour", "hh", "hr", "hours", "hrs", 
+  "minute", "m", "mi", "min", "minutes", "mins", 
+  "second", "s", "sec", "seconds", "secs"})
+
 (defn- create-replacement-snippet [nil-or-obj]
-  (let [{:keys [sql-string param-values]} (sql/->prepared-substitution driver/*driver* nil-or-obj)]
-    {:replacement-snippet     sql-string
-     :prepared-statement-args param-values}))
+  (let [nil-or-obj-for-params (if (or (= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) nil nil-or-obj)]
+  (let [{:keys [sql-string param-values]} (sql/->prepared-substitution driver/*driver* nil-or-obj-for-params)]
+    {:replacement-snippet   (if (and (not= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) (str "'" (str/lower-case nil-or-obj) "'") sql-string)
+     :prepared-statement-args param-values})))
 
 (defn- prepared-ts-subs [operator date-str]
   (let [{:keys [sql-string param-values]} (sql/->prepared-substitution driver/*driver* (du/->Timestamp date-str))]
