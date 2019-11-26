@@ -391,7 +391,7 @@
 (defn- create-replacement-snippet [nil-or-obj]
   (let [nil-or-obj-for-params (if (or (= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) nil nil-or-obj)]
   (let [{:keys [sql-string param-values]} (sql/->prepared-substitution qp.i/*driver* nil-or-obj-for-params)]
-    {:replacement-snippet   (if (and (not= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) (str "'" (str/lower-case nil-or-obj) "'") sql-string)
+    {:replacement-snippet   (if (and (not= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) (str "'" nil-or-obj "'") sql-string)
      :prepared-statement-args param-values})))
 
 (defn- prepared-ts-subs [operator date-str]
