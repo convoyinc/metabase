@@ -26,6 +26,16 @@
            java.util.UUID
            [metabase.driver.common.parameters CommaSeparatedNumbers Date DateRange FieldFilter MultipleValues]))
 
+(def date-parts #{
+  "year", "y", "yy", "yyy", "yyyy", "yr", "years", "yrs", 
+  "month", "mm", "mon", "mons", "months", 
+  "day", "d", "dd", "days", "dayofmonth", 
+  "week", "w", "wk", "weekofyear", "woy", "wy", 
+  "quarter", "q", "qtr", "qtrs", "quarters", 
+  "hourh", "hh", "hr", "hours", "hrs", 
+  "minute", "m", "mi", "min", "minutes", "mins", 
+  "second", "s", "sec", "seconds", "secs"})
+
 ;;; ------------------------------------ ->prepared-substitution & default impls -------------------------------------
 
 (defmulti ->prepared-substitution
@@ -103,9 +113,10 @@
   :hierarchy #'driver/hierarchy)
 
 (defn- create-replacement-snippet [nil-or-obj]
-  (let [{:keys [sql-string param-values]} (->prepared-substitution driver/*driver* nil-or-obj)]
-    {:replacement-snippet     sql-string
-     :prepared-statement-args param-values}))
+  (let [nil-or-obj-for-params (if (or (= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) nil nil-or-obj)]
+  (let [{:keys [sql-string param-values]} (->prepared-substitution driver/*driver* nil-or-obj-for-params)]
+    {:replacement-snippet   (if (and (not= nil-or-obj nil) (contains? date-parts (str/lower-case nil-or-obj))) (str "'" nil-or-obj "'") sql-string)
+     :prepared-statement-args param-values})))
 
 (defmethod ->replacement-snippet-info [:sql nil]
   [_ this]
