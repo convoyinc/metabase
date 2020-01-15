@@ -1,6 +1,10 @@
 (ns metabase.driver.snowflake
   "Snowflake Driver."
-  (:require [clojure
+  (:require [clj-time
+             [coerce :as tcoerce]
+             [core :as tcore]
+             [format :as time]]
+            [clojure
              [set :as set]
              [string :as str]]
             [clojure.java.jdbc :as jdbc]
@@ -26,7 +30,10 @@
              [date-2 :as u.date]
              [honeysql-extensions :as hx]
              [i18n :refer [tru]]])
-  (:import [java.sql ResultSet Types]
+
+  (:import [java.sql ResultSet Time Timestamp Types SQLException]
+           [java.util Calendar Date TimeZone]
+           [java.text SimpleDateFormat]
            [java.time OffsetDateTime ZonedDateTime]
            metabase.util.honeysql_extensions.Identifier))
 
@@ -59,8 +66,8 @@
                 ;; https://docs.snowflake.net/manuals/sql-reference/parameters.html#client-session-keep-alive
                 :client_session_keep_alive                  true
                 ;; other SESSION parameters
-                ;; use the same week start we use for all the other drivers
-                :week_start                                 7
+                ;; use the default snowflake week_start, which matches Redshift
+                :week_start                                 0
                 ;; not 100% sure why we need to do this but if we don't set the connection to UTC our report timezone
                 ;; stuff doesn't work, even though we ultimately override this when we set the session timezone
                 :timezone                                   "UTC"}
@@ -265,8 +272,8 @@
   (str/lower-case s))
 
 ;; See https://docs.snowflake.net/manuals/sql-reference/data-types-datetime.html#timestamp.
-(defmethod driver.common/current-db-time-date-formatters :snowflake
-  [_]
+(defmethod driver.common/current-db-time-date-formatters :snowflake 
+[_]
   (driver.common/create-db-time-formatters "yyyy-MM-dd HH:mm:ss.SSSSSSSSS Z"))
 
 (defmethod driver.common/current-db-time-native-query :snowflake
@@ -289,44 +296,40 @@
          (jdbc/query spec sql)
          true)))
 
-(defmethod unprepare/unprepare-value [:snowflake OffsetDateTime]
-  [_ t]
-  (format "timestamp '%s %s %s'" (t/local-date t) (t/local-time t) (t/zone-offset t)))
+(defmethod unprepare/unprepare-value [:snowflake Date] [_ value]
+  (format "timestamp '%s'" (u.date/format value)))
 
-(defmethod unprepare/unprepare-value [:snowflake ZonedDateTime]
-  [driver t]
-  (unprepare/unprepare-value driver (t/offset-date-time t)))
+(prefer-method unprepare/unprepare-value [:sql Time] [:snowflake Date])
 
-;; Like Vertica, Snowflake doesn't seem to be able to return a LocalTime/OffsetTime like everyone else, but it can
-;; return a String that we can parse
-(defmethod sql-jdbc.execute/read-column-thunk [:snowflake Types/TIME]
-  [_ ^ResultSet rs _ ^Integer i]
-  (fn []
-    (when-let [s (.getString rs i)]
-      (let [t (u.date/parse s)]
-        (log/tracef "(.getString rs %d) [TIME] -> %s -> %s" i (pr-str s) (pr-str t))
-        t))))
+;;; +----------------------------------------------------------------------------------------------------------------+
+;;; |                                         metabase.driver.sql-jdbc.execute impls                                 |
+;;; +----------------------------------------------------------------------------------------------------------------+
 
-(defmethod sql-jdbc.execute/read-column-thunk [:snowflake Types/TIME_WITH_TIMEZONE]
-  [_ ^ResultSet rs _ ^Integer i]
-  (fn []
-    (when-let [s (.getString rs i)]
-      (let [t (u.date/parse s)]
-        (log/tracef "(.getString rs %d) [TIME_WITH_TIMEZONE] -> %s -> %s" i (pr-str s) (pr-str t))
-        t))))
+;; Metabase attempts to display all timestamps into either the local time of the server, or the :report-timezone 
+;; setting's value if it's set in the Amin console. We prefer to have timestamps displayed in the wall clock time
+;; of their respective timezones. The below methods accomplish that (somewhat hackily)
 
-;; TODO ­ would it make more sense to use functions like `timestamp_tz_from_parts` directly instead of JDBC parameters?
+(def simple-date-format (new SimpleDateFormat "yyyy-MM-dd"))
+(def simple-time-format (new SimpleDateFormat "HH:mm:ss"))
+(def simple-timestamp-format (new SimpleDateFormat "yyyy-MM-dd HH:mm:ss.SSS"))
 
-;; Snowflake seems to ignore the calendar parameter of `.setTime` and `.setTimestamp` and instead uses the session
-;; timezone; normalize temporal values to UTC so we end up with the right values
-(defmethod sql-jdbc.execute/set-parameter [::use-legacy-classes-for-read-and-set java.time.OffsetTime]
-  [driver ps i t]
-  (sql-jdbc.execute/set-parameter driver ps i (t/sql-time (t/with-offset-same-instant t (t/zone-offset 0)))))
+(defmethod sql-jdbc.execute/read-column [:snowflake Types/TIME] [_ _, ^ResultSet resultset, _, ^Integer i]
+  (let [result (.getString resultset i)]
+    (if result 
+      (let [timestamp-string (clojure.string/join " " (take 2 (clojure.string/split (.getString resultset i) #" ")))]
+        (u.date/parse timestamp-string))
+      nil)))
 
-(defmethod sql-jdbc.execute/set-parameter [::use-legacy-classes-for-read-and-set java.time.OffsetDateTime]
-  [driver ps i t]
-  (sql-jdbc.execute/set-parameter driver ps i (t/sql-timestamp (t/with-offset-same-instant t (t/zone-offset 0)))))
+(defmethod sql-jdbc.execute/read-column [:snowflake Types/TIMESTAMP] [_ calendar resultset _ i]
+  (let [result (.getString resultset i)]
+    (if result 
+      (let [timestamp-string (clojure.string/join " " (take 2 (clojure.string/split (.getString resultset i) #" ")))]
+        (u.date/parse timestamp-string))
+      nil)))
 
-(defmethod sql-jdbc.execute/set-parameter [:snowflake java.time.ZonedDateTime]
-  [driver ps i t]
-  (sql-jdbc.execute/set-parameter driver ps i (t/sql-timestamp (t/with-zone-same-instant t (t/zone-id "UTC")))))
+(defmethod sql-jdbc.execute/read-column [:snowflake Types/DATE] [_ calendar resultset _ i]
+  (let [result (.getString resultset i)]
+    (if result 
+      (let [timestamp-string (clojure.string/join " " (take 2 (clojure.string/split (.getString resultset i) #" ")))]
+        (u.date/parse timestamp-string))
+      nil)))
