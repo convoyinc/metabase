@@ -314,7 +314,7 @@ export const initializeQB = (location, params) => {
       databaseFetch = dispatch(
         Databases.actions.fetchList({
           include_tables: true,
-          include_cards: true,
+          include_cards: false,
         }),
       );
     } catch (error) {
@@ -602,7 +602,7 @@ export const updateTemplateTag = createThunkAction(
           const newTag =
             tags[name] && tags[name].type !== templateTag.type
               ? // when we switch type, null out any default
-                { ...templateTag, default: null }
+              { ...templateTag, default: null }
               : templateTag;
           return { ...tags, [name]: newTag };
         },
@@ -652,12 +652,12 @@ export const setCardAndRun = (nextCard, shouldUpdateUrl = true) => {
 
     const originalCard = card.original_card_id
       ? // If the original card id is present, dynamically load its information for showing lineage
-        await loadCard(card.original_card_id)
+      await loadCard(card.original_card_id)
       : // Otherwise, use a current card as the original card if the card has been saved
       // This is needed for checking whether the card is in dirty state or not
       card.id
-      ? card
-      : null;
+        ? card
+        : null;
 
     // Update the card and originalCard before running the actual query
     dispatch.action(SET_CARD_AND_RUN, { card, originalCard });
@@ -941,7 +941,7 @@ export const runQuestionQuery = ({
     // HACK: prevent SQL editor from losing focus
     try {
       ace.edit("id_sql").focus();
-    } catch (e) {}
+    } catch (e) { }
 
     dispatch.action(RUN_QUERY, { cancelQueryDeferred });
   };

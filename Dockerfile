@@ -16,12 +16,12 @@ ENV LC_CTYPE en_US.UTF-8
 # make:    backend building
 # gettext: translations
 
-RUN apk add --update bash yarn git wget make gettext
+RUN apk add --update bash yarn git wget make gettext coreutils
 
 # lein:    backend dependencies and building
 ADD https://raw.github.com/technomancy/leiningen/stable/bin/lein /usr/local/bin/lein
 RUN chmod 744 /usr/local/bin/lein
-RUN lein upgrade
+RUN lein upgrade 2.9.1
 
 # install dependencies before adding the rest of the source to maximize caching
 
