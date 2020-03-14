@@ -49,6 +49,7 @@ import {
 } from "./selectors";
 
 import { MetabaseApi, CardApi, UserApi } from "metabase/services";
+import Databases from "metabase/entities/databases";
 
 import { parse as urlParse } from "url";
 import querystring from "querystring";
@@ -60,7 +61,6 @@ import { getCardAfterVisualizationClick } from "metabase/visualizations/lib/util
 import { getPersistableDefaultSettingsForSeries } from "metabase/visualizations/lib/settings/visualization";
 
 import Questions from "metabase/entities/questions";
-import Databases from "metabase/entities/databases";
 
 import { getMetadata } from "metabase/selectors/metadata";
 import { setRequestUnloaded } from "metabase/redux/requests";
@@ -299,22 +299,15 @@ export const initializeQB = (location, params) => {
     dispatch(resetQB());
     dispatch(cancelQuery());
 
-    const { currentUser } = getState();
+    // preload metadata that's used in DataSelector
+    dispatch(Databases.actions.fetchList({ include: "tables" }));
+    dispatch(Databases.actions.fetchList({ saved: true }));
 
-    let card, originalCard;
-    const uiControls: UiControls = {
-      isEditing: false,
-      isShowingTemplateTagsEditor: false,
-      queryBuilderMode: getQueryBuilderModeFromLocation(location),
-    };
-
-    // always start the QB by loading up the databases for the application
-    let databaseFetch;
     try {
-      databaseFetch = dispatch(
+      dispatch(
         Databases.actions.fetchList({
           include_tables: true,
-          include_cards: false,
+          include_cards: true,
         }),
       );
     } catch (error) {
@@ -326,6 +319,18 @@ export const initializeQB = (location, params) => {
       // dispatch(setErrorPage(error));
       // return { uiControls };
     }
+
+    const { currentUser } = getState();
+
+    let card, originalCard;
+    const uiControls: UiControls = {
+      isEditing: false,
+      isShowingTemplateTagsEditor: false,
+      queryBuilderMode: getQueryBuilderModeFromLocation(location),
+    };
+
+    // always start the QB by loading up the databases for the application
+
 
     // load up or initialize the card we'll be working on
     let options = {};
@@ -448,12 +453,8 @@ export const initializeQB = (location, params) => {
     if (card && card.id != null) {
       dispatch(fetchAlertsForQuestion(card.id));
     }
-    // Fetch the question metadata (blocking)
+    // Fetch the question metadata 
     if (card) {
-      // ensure that the database fetch completed before getting the tables
-      if (databaseFetch) {
-        await databaseFetch;
-      }
       await dispatch(loadMetadataForCard(card));
     }
 
