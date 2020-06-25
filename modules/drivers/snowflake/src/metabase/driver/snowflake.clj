@@ -26,6 +26,7 @@
             [metabase.driver.sql.query-processor :as sql.qp]
             [metabase.driver.sql.util.unprepare :as unprepare]
             [metabase.query-processor.store :as qp.store]
+            [metabase.query-processor.middleware.format-rows :as format-rows]
             [metabase.util
              [date-2 :as u.date]
              [honeysql-extensions :as hx]
@@ -320,6 +321,16 @@
   (format "timestamp '%s'" (u.date/format value)))
 
 (prefer-method unprepare/unprepare-value [:sql Time] [:snowflake Date])
+
+;;; +----------------------------------------------------------------------------------------------------------------+
+;;; |                                         FormatValue protocol overrides impls                                   |
+;;; +----------------------------------------------------------------------------------------------------------------+
+;; Overrides how specific types are formatted when serializing query results
+
+(extend-protocol format-rows/FormatValue
+  java.time.LocalDate
+  (format-value [t _] t)
+)
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
 ;;; |                                         metabase.driver.sql-jdbc.execute impls                                 |
