@@ -106,6 +106,11 @@ const Questions = createEntity({
           type: "text",
           placeholder: t`It's optional but oh, so helpful`,
         },
+        {
+          name: "cache_ttl",
+          title: t`Cache TTL Multiplier`,
+          placeholder: t`Optionally override the default cache settings (ooh, fancy!)`,
+        },
       ],
     },
   },

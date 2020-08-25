@@ -55,6 +55,13 @@ export default class SaveQuestionModal extends Component {
         details.saveType === "overwrite"
           ? originalCard.collection_id
           : details.collection_id,
+      // since cache_ttl is optional, it can be null, so check for a value before trimming it
+      cache_ttl:
+        details.saveType === "overwrite"
+          ? originalCard.cache_ttl
+          : details.cache_ttl
+          ? details.cache_ttl.trim()
+          : null,
     };
 
     if (details.saveType === "create") {
@@ -107,6 +114,7 @@ export default class SaveQuestionModal extends Component {
             { name: "name" },
             { name: "description" },
             { name: "collection_id" },
+            { name: "cache_ttl" },
           ]}
           onSubmit={this.handleSubmit}
         >
@@ -146,6 +154,11 @@ export default class SaveQuestionModal extends Component {
                       name="collection_id"
                       title={t`Which collection should this go in?`}
                       type="collection"
+                    />
+                    <FormField
+                      name="cache_ttl"
+                      title={t`Cache TTL Multiplier`}
+                      placeholder={t`Optionally override the default cache settings (ooh, fancy!)`}
                     />
                   </div>
                 )}
