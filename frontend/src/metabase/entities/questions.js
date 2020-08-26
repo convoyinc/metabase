@@ -129,6 +129,7 @@ const Questions = createEntity({
     "collection_position",
     "result_metadata",
     "metadata_checksum",
+    "cache_ttl",
   ],
 
   getAnalyticsMetadata([object], { action }, getState) {

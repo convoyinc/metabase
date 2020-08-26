@@ -158,6 +158,7 @@ export default class SaveQuestionModal extends Component {
                     <FormField
                       name="cache_ttl"
                       title={t`Cache TTL Multiplier`}
+                      type="input"
                       placeholder={t`Optionally override the default cache settings (ooh, fancy!)`}
                     />
                   </div>

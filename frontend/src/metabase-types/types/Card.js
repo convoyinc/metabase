@@ -29,6 +29,7 @@ export type Card = {
   parameters?: Array<Parameter>,
   can_write: boolean,
   public_uuid: string,
+  cache_ttl: number,
 
   // Not part of the card API contract, a field used by query builder for showing lineage
   original_card_id?: CardId,
