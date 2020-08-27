@@ -37,7 +37,6 @@ export default class SaveQuestionModal extends Component {
     //     .setDescription(details.description ? details.description.trim() : null)
     //     .setCollectionId(details.collection_id)
     let { card, originalCard, onCreate, onSave } = this.props;
-
     card = {
       ...card,
       name:
@@ -55,13 +54,15 @@ export default class SaveQuestionModal extends Component {
         details.saveType === "overwrite"
           ? originalCard.collection_id
           : details.collection_id,
-      // since cache_ttl is optional, it can be null, so check for a value before trimming it
+      // cache_ttl is also optional, but pass non-int values to the API so it can handle the error
       cache_ttl:
         details.saveType === "overwrite"
           ? originalCard.cache_ttl
-          : details.cache_ttl
-          ? details.cache_ttl.trim()
-          : null,
+          : !details.cache_ttl // check if blank, since field is optional
+          ? null
+          : Number.isNaN(parseInt(details.cache_ttl)) // if non-int value
+          ? details.cache_ttl // send non-int to API
+          : parseInt(details.cache_ttl)
     };
 
     if (details.saveType === "create") {
