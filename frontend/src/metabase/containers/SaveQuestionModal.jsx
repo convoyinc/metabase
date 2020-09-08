@@ -60,9 +60,9 @@ export default class SaveQuestionModal extends Component {
           ? originalCard.cache_ttl
           : !details.cache_ttl // check if blank, since field is optional
           ? null
-          : details.cache_ttl.match(/[^$,.\d]/)  // if non-numeric value
+          : details.cache_ttl.match(/[^$,.\d]/) // if non-numeric value
           ? details.cache_ttl // send non-numeric value and let API handle error
-          : parseFloat(details.cache_ttl) // else parse float and send to API (which will handle decimals)
+          : parseFloat(details.cache_ttl), // else parse float and send to API (which will handle decimals)
     };
 
     if (details.saveType === "create") {
