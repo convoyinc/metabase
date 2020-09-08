@@ -220,7 +220,7 @@
   ;; `zipmap` instead of `select-keys` because we want to get `nil` values for keys that aren't present. Required by
   ;; `api/maybe-reconcile-collection-position!`
   (let [data-keys            [:dataset_query :description :display :name
-                              :visualization_settings :collection_id :collection_position]
+                              :visualization_settings :collection_id :collection_position :cache_ttl]
         card-data            (assoc (zipmap data-keys (map card-data data-keys))
                                     :creator_id api/*current-user-id*)
         result-metadata-chan (result-metadata-async dataset_query result_metadata metadata_checksum)
@@ -409,7 +409,7 @@
         (u/select-keys-when card-updates
           :present #{:collection_id :collection_position :description}
           :non-nil #{:dataset_query :display :name :visualization_settings :archived :enable_embedding
-                     :embedding_params :result_metadata})))
+                     :embedding_params :result_metadata :cache_ttl})))
     ;; Fetch the updated Card from the DB
     (let [card (Card id)]
       (delete-alerts-if-needed! card-before-update card)
