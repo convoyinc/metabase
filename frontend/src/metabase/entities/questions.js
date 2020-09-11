@@ -109,7 +109,7 @@ const Questions = createEntity({
         {
           name: "cache_ttl",
           title: t`Cache TTL Multiplier`,
-          placeholder: t`Optionally override the default cache settings (ooh, fancy!)`,
+          placeholder: t`Query time (sec) * TTL Multiplier = time your query result stays cached`,
         },
       ],
     },

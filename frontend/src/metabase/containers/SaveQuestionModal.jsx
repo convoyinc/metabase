@@ -160,7 +160,7 @@ export default class SaveQuestionModal extends Component {
                       name="cache_ttl"
                       title={t`Cache TTL Multiplier`}
                       type="input"
-                      placeholder={t`Optionally override the default cache settings (ooh, fancy!)`}
+                      placeholder={t`Query time (sec) * TTL Multiplier = time your query result stays cached`}
                     />
                   </div>
                 )}
