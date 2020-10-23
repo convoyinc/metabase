@@ -25,6 +25,7 @@ export type SettingName =
   | "ldap-configured?"
   | "map-tile-server-url"
   | "password-complexity"
+  | "query-caching-ttl-ratio"
   | "setup-token"
   | "site-url"
   | "types"

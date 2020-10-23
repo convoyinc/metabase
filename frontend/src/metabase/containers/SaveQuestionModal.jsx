@@ -37,7 +37,6 @@ export default class SaveQuestionModal extends Component {
     //     .setDescription(details.description ? details.description.trim() : null)
     //     .setCollectionId(details.collection_id)
     let { card, originalCard, onCreate, onSave } = this.props;
-
     card = {
       ...card,
       name:
@@ -55,6 +54,15 @@ export default class SaveQuestionModal extends Component {
         details.saveType === "overwrite"
           ? originalCard.collection_id
           : details.collection_id,
+      // cache_ttl is also optional, but pass non-int values to the API so it can handle the error
+      cache_ttl:
+        details.saveType === "overwrite"
+          ? originalCard.cache_ttl
+          : !details.cache_ttl // check if blank, since field is optional
+          ? null
+          : details.cache_ttl.match(/[^$,.\d]/) // if non-numeric value
+          ? details.cache_ttl // send non-numeric value and let API handle error
+          : parseFloat(details.cache_ttl), // else parse float and send to API (which will handle decimals)
     };
 
     if (details.saveType === "create") {
@@ -107,6 +115,7 @@ export default class SaveQuestionModal extends Component {
             { name: "name" },
             { name: "description" },
             { name: "collection_id" },
+            { name: "cache_ttl" },
           ]}
           onSubmit={this.handleSubmit}
         >
@@ -146,6 +155,12 @@ export default class SaveQuestionModal extends Component {
                       name="collection_id"
                       title={t`Which collection should this go in?`}
                       type="collection"
+                    />
+                    <FormField
+                      name="cache_ttl"
+                      title={t`Cache TTL Multiplier`}
+                      type="input"
+                      placeholder={t`Query time (sec) * TTL Multiplier = time your query result stays cached`}
                     />
                   </div>
                 )}
