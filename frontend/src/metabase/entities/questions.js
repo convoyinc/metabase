@@ -106,6 +106,11 @@ const Questions = createEntity({
           type: "text",
           placeholder: t`It's optional but oh, so helpful`,
         },
+        {
+          name: "cache_ttl",
+          title: t`Cache TTL Multiplier`,
+          placeholder: t`Query time (sec) * TTL Multiplier = time your query result stays cached`,
+        },
       ],
     },
   },
@@ -124,6 +129,7 @@ const Questions = createEntity({
     "collection_position",
     "result_metadata",
     "metadata_checksum",
+    "cache_ttl",
   ],
 
   getAnalyticsMetadata([object], { action }, getState) {

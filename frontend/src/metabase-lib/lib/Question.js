@@ -135,6 +135,7 @@ export default class Question {
     dataset_query = type === "native"
       ? NATIVE_QUERY_TEMPLATE
       : STRUCTURED_QUERY_TEMPLATE,
+    cache_ttl,
   }: {
     databaseId?: DatabaseId,
     tableId?: TableId,
@@ -145,6 +146,7 @@ export default class Question {
     display?: string,
     visualization_settings?: VisualizationSettings,
     dataset_query?: DatasetQuery,
+    cache_ttl?: number,
   } = {}) {
     // $FlowFixMe
     let card: Card = {
