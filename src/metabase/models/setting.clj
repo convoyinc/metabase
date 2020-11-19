@@ -180,14 +180,14 @@
   "Get string value of `setting-definition-or-name`. This is the default getter for `String` settings; value is fetched
   as follows:
 
-   1.  From the database (i.e., set via the admin panel), if a value is present;
-   2.  From corresponding env var, if any;
+   1.  From corresponding env var, if any;
+   2.  From the database (i.e., set via the admin panel), if a value is present;
    3.  The default value, if one was specified.
 
    If the fetched value is an empty string it is considered to be unset and this function returns `nil`."
   ^String [setting-definition-or-name]
-  (let [v (or (db-or-cache-value setting-definition-or-name)
-              (env-var-value setting-definition-or-name)
+  (let [v (or (env-var-value setting-definition-or-name)
+              (db-or-cache-value setting-definition-or-name)
               (str (:default (resolve-setting setting-definition-or-name))))]
     (when (seq v)
       v)))
